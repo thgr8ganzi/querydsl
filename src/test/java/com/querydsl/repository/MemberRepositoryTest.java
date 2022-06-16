@@ -3,43 +3,45 @@ package com.querydsl.repository;
 import com.querydsl.dto.MemberSearchCondition;
 import com.querydsl.dto.MemberTeamDto;
 import com.querydsl.entity.Member;
+import com.querydsl.entity.QMember;
 import com.querydsl.entity.Team;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
-import static org.assertj.core.api.Assertions.*;
 
 import javax.persistence.EntityManager;
-
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-class MemberJpaRepositoryTest {
+class MemberRepositoryTest {
 
     @Autowired
     EntityManager em;
 
     @Autowired
-    MemberJpaRepository memberJpaRepository;
+    MemberRepository memberRepository;
 
     @Test
     public void basicTest() throws Exception{
         Member member = new Member("member1", 10);
-        memberJpaRepository.save(member);
+        memberRepository.save(member);
 
-        Member findMemer = memberJpaRepository.findById(member.getId()).get();
+        Member findMemer = memberRepository.findById(member.getId()).get();
         assertThat(findMemer).isEqualTo(member);
 
-        List<Member> result1 = memberJpaRepository.findAll_Querydsl();
+        List<Member> result1 = memberRepository.findAll();
         assertThat(result1).containsExactly(member);
 
-        List<Member> result2 = memberJpaRepository.findByUserName_Querydsl("member1");
+        List<Member> result2 = memberRepository.findByUsername("member1");
         assertThat(result2).containsExactly(member);
     }
+
     @Test
     public void searchTest() throws Exception{
         Team teamA = new Team("teamA");
@@ -62,14 +64,14 @@ class MemberJpaRepositoryTest {
         condition.setAgeLoe(40);
         condition.setTeamName("teamB");
 
-        List<MemberTeamDto> result = memberJpaRepository.searchByBuilder(condition);
+        List<MemberTeamDto> result = memberRepository.search(condition);
 
         assertThat(result).extracting("username").containsExactly("member4");
 
     }
 
     @Test
-    public void searchTest2() throws Exception{
+    public void searchPageSimple() throws Exception{
         Team teamA = new Team("teamA");
         Team teamB = new Team("teamB");
         em.persist(teamA);
@@ -86,17 +88,18 @@ class MemberJpaRepositoryTest {
         em.persist(member4);
 
         MemberSearchCondition condition = new MemberSearchCondition();
-        condition.setAgeGoe(35);
-        condition.setAgeLoe(40);
-        condition.setTeamName("teamB");
+        PageRequest pageRequest = PageRequest.of(0, 3);
 
-        List<MemberTeamDto> result = memberJpaRepository.search(condition);
+        Page<MemberTeamDto> result = memberRepository.searchPageSimple(condition, pageRequest);
 
-        assertThat(result).extracting("username").containsExactly("member4");
+        assertThat(result.getSize()).isEqualTo(3);
+        assertThat(result.getContent()).extracting("username").containsExactly("member1", "member2", "member3");
 
     }
+
     @Test
-    public void searchTest3() throws Exception{
+    public void querydslPredicateExecutorTest() throws Exception{
+
         Team teamA = new Team("teamA");
         Team teamB = new Team("teamB");
         em.persist(teamA);
@@ -112,56 +115,12 @@ class MemberJpaRepositoryTest {
         em.persist(member3);
         em.persist(member4);
 
-        MemberSearchCondition condition = new MemberSearchCondition();
-        condition.setAgeGoe(35);
-        condition.setAgeLoe(40);
-        condition.setTeamName("teamB");
+        QMember member = QMember.member;
+        Iterable<Member> result = memberRepository.findAll(member.age.between(10, 40).and(member.username.eq("member1")));
 
-        List<Member> result = memberJpaRepository.searchByBuilderMember(condition);
-
-        assertThat(result).extracting("username").containsExactly("member4");
-
+        for (Member findMember : result) {
+            System.out.println("findMember = " + findMember);
+        }
     }
-    @Test
-    public void searchTest4() throws Exception{
-        Team teamA = new Team("teamA");
-        Team teamB = new Team("teamB");
-        em.persist(teamA);
-        em.persist(teamB);
-
-        Member member1 = new Member("member1", 10, teamA);
-        Member member2 = new Member("member2", 20, teamA);
-
-        Member member3 = new Member("member3", 30, teamB);
-        Member member4 = new Member("member4", 40, teamB);
-        em.persist(member1);
-        em.persist(member2);
-        em.persist(member3);
-        em.persist(member4);
-
-        MemberSearchCondition condition = new MemberSearchCondition();
-        condition.setAgeGoe(35);
-        condition.setAgeLoe(40);
-        condition.setTeamName("teamB");
-
-        List<Member> result = memberJpaRepository.searchMember(condition);
-
-        assertThat(result).extracting("username").containsExactly("member4");
-
-    }
-
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
